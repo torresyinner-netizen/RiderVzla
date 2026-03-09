@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MotoRide - Conductor</title>
+    <title>MotoRide Conductor</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -14,6 +14,7 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; height: 100vh; background: #000; }
         #map { height: 100%; width: 100%; z-index: 1; }
         
+        /* Panel inferior del conductor */
         .driver-panel {
             position: absolute; bottom: 0; left: 0; right: 0;
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(15px);
@@ -61,7 +62,6 @@
         .btn-logout {
             background: transparent; color: #6b7280; border: none;
             margin-top: 20px; padding: 12px; cursor: pointer;
-            width: 100%;
         }
     </style>
 </head>
@@ -103,23 +103,25 @@
     </div>
 
     <script>
-        // Configuración de Supabase (tus credenciales)
+        // ================== CONFIGURACIÓN SUPABASE ==================
         const SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZ2RjemV6eW1hYWxjbndiZmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDU1NjgsImV4cCI6MjA4ODYyMTU2OH0.fyM-HOvnH8_XofOqjAyRe604m7EkodKDkhXqzhG7R_o';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // Crear cliente Supabase (asegurar que no hay otra declaración previa)
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // ================== VARIABLES GLOBALES ==================
         let map;
         let driverMarker;
         let pendingMarkers = {}; // { rideId: marker }
         let watchId = null;
         let currentUser = null;
         let driverActive = false;
-        let currentPosition = { lat: 10.1620, lng: -68.0077 }; // fallback
+        let currentPosition = { lat: 10.1620, lng: -68.0077 }; // fallback Valencia
         let selectedRideId = null;
         let ridesSubscription = null;
-        let pendingRidesData = {}; // guardar datos completos de viajes
 
-        // Inicializar mapa
+        // ================== FUNCIONES DEL MAPA ==================
         function initMap() {
             map = L.map('map', { zoomControl: true }).setView([currentPosition.lat, currentPosition.lng], 14);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -148,13 +150,12 @@
 
             if (driverActive && currentUser) {
                 updateDriverLocationInDB(latitude, longitude);
-                // Al actualizar ubicación, refrescar viajes cercanos (opcional)
-                loadNearbyPendingRides();
             }
         }
 
-        // Guardar ubicación del conductor en Supabase (versión con lat/lng)
+        // Guardar ubicación en Supabase (versión con PostGIS)
         async function updateDriverLocationInDB(lat, lng) {
+            // Verificar si ya existe un registro para este conductor
             const { data: existing } = await supabase
                 .from('driver_locations')
                 .select('id')
@@ -164,21 +165,25 @@
             if (existing) {
                 await supabase
                     .from('driver_locations')
-                    .update({ lat: lat, lng: lng, updated_at: new Date() })
+                    .update({ 
+                        location: `POINT(${lng} ${lat})`, 
+                        updated_at: new Date() 
+                    })
                     .eq('driver_id', currentUser.id);
             } else {
                 await supabase
                     .from('driver_locations')
-                    .insert({ driver_id: currentUser.id, lat: lat, lng: lng, is_active: true });
+                    .insert({ 
+                        driver_id: currentUser.id, 
+                        location: `POINT(${lng} ${lat})`, 
+                        is_active: true 
+                    });
             }
         }
 
-        // Activar/desactivar disponibilidad
+        // ================== CONTROL DE DISPONIBILIDAD ==================
         async function toggleAvailability() {
-            if (!currentUser) {
-                alert('Debes iniciar sesión primero');
-                return;
-            }
+            if (!currentUser) return;
 
             driverActive = !driverActive;
             const toggleBtn = document.getElementById('toggle-availability');
@@ -198,15 +203,12 @@
                 if (!watchId && navigator.geolocation) {
                     watchId = navigator.geolocation.watchPosition(
                         updateDriverPosition,
-                        (error) => {
-                            console.warn('Error GPS:', error);
-                            document.getElementById('driver-coords').innerText = 'Error obteniendo ubicación';
-                        },
+                        (error) => console.warn('Error GPS:', error),
                         { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
                     );
                 }
 
-                // Si ya tenemos posición, guardar inmediatamente
+                // Asegurar que la ubicación actual esté en DB
                 if (currentPosition) {
                     await updateDriverLocationInDB(currentPosition.lat, currentPosition.lng);
                     // Marcar como activo
@@ -217,8 +219,7 @@
                 }
 
                 // Cargar viajes pendientes cercanos
-                await loadNearbyPendingRides();
-
+                loadNearbyPendingRides();
                 // Suscribirse a nuevos viajes
                 subscribeToNewRides();
             } else {
@@ -251,38 +252,18 @@
                 // Limpiar marcadores de viajes
                 Object.values(pendingMarkers).forEach(m => map.removeLayer(m));
                 pendingMarkers = {};
-                pendingRidesData = {};
-                updateRequestsList();
+                document.getElementById('requests-list').innerHTML = '<p style="color: #9ca3af; text-align: center;">No hay viajes cercanos</p>';
+                document.getElementById('selected-request').style.display = 'none';
+                selectedRideId = null;
             }
         }
 
-        // Suscribirse a cambios en la tabla rides (nuevos pending)
-        function subscribeToNewRides() {
-            ridesSubscription = supabase
-                .channel('rides-pending')
-                .on('postgres_changes', 
-                    { event: 'INSERT', schema: 'public', table: 'rides', filter: 'status=eq.pending' },
-                    (payload) => {
-                        const ride = payload.new;
-                        // Verificar si está cerca
-                        if (currentPosition) {
-                            const dist = getDistanceFromLatLonInKm(
-                                currentPosition.lat, currentPosition.lng,
-                                ride.pickup_lat, ride.pickup_lng
-                            );
-                            if (dist <= 5) {
-                                addRideMarker(ride);
-                            }
-                        }
-                    }
-                )
-                .subscribe();
-        }
-
+        // ================== GESTIÓN DE VIAJES ==================
         // Cargar viajes pendientes cercanos
         async function loadNearbyPendingRides() {
             if (!currentUser || !driverActive) return;
 
+            // Obtener viajes pending sin driver asignado
             const { data: rides, error } = await supabase
                 .from('rides')
                 .select('*')
@@ -297,7 +278,6 @@
             // Limpiar marcadores anteriores
             Object.values(pendingMarkers).forEach(m => map.removeLayer(m));
             pendingMarkers = {};
-            pendingRidesData = {};
 
             rides.forEach(ride => {
                 if (currentPosition) {
@@ -305,21 +285,43 @@
                         currentPosition.lat, currentPosition.lng,
                         ride.pickup_lat, ride.pickup_lng
                     );
-                    if (dist <= 5) {
+                    if (dist <= 5) { // radio 5 km
                         addRideMarker(ride);
                     }
                 }
             });
         }
 
-        // Añadir un marcador de viaje al mapa y a la lista
+        // Suscribirse a nuevos viajes
+        function subscribeToNewRides() {
+            ridesSubscription = supabase
+                .channel('rides-pending')
+                .on('postgres_changes', 
+                    { event: 'INSERT', schema: 'public', table: 'rides', filter: 'status=eq.pending' },
+                    (payload) => {
+                        const ride = payload.new;
+                        // Solo si está cerca y no tiene driver
+                        if (!ride.driver_id && currentPosition) {
+                            const dist = getDistanceFromLatLonInKm(
+                                currentPosition.lat, currentPosition.lng,
+                                ride.pickup_lat, ride.pickup_lng
+                            );
+                            if (dist <= 5) {
+                                addRideMarker(ride);
+                            }
+                        }
+                    }
+                )
+                .subscribe();
+        }
+
+        // Añadir marcador de viaje
         function addRideMarker(ride) {
             if (!driverActive) return;
 
-            // Guardar datos completos
-            pendingRidesData[ride.id] = ride;
+            // Evitar duplicados
+            if (pendingMarkers[ride.id]) return;
 
-            // Crear marcador
             const passengerIcon = L.divIcon({
                 className: 'passenger-icon',
                 html: '<div style="background-color:#ef4444; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px #ef4444;"></div>',
@@ -335,10 +337,11 @@
 
             pendingMarkers[ride.id] = marker;
 
+            // Actualizar lista HTML
             updateRequestsList();
         }
 
-        // Actualizar la lista de viajes en el panel
+        // Actualizar lista de viajes en el panel
         function updateRequestsList() {
             const listDiv = document.getElementById('requests-list');
             if (Object.keys(pendingMarkers).length === 0) {
@@ -348,10 +351,9 @@
 
             let html = '';
             Object.keys(pendingMarkers).forEach(rideId => {
-                const ride = pendingRidesData[rideId] || {};
-                html += `<div class="request-item ${selectedRideId === rideId ? 'selected' : ''}" onclick="selectRide('${rideId}')">
-                    <strong>Viaje #${rideId.slice(0,6)}</strong><br>
-                    <small>📍 A ${getDistanceFromLatLonInKm(currentPosition.lat, currentPosition.lng, ride.pickup_lat, ride.pickup_lng).toFixed(1)} km</small>
+                html += `<div class="request-item" onclick="selectRide('${rideId}')">
+                    <strong>Viaje #${rideId.slice(0,8)}</strong><br>
+                    <small>📍 Pasajero cercano</small>
                 </div>`;
             });
             listDiv.innerHTML = html;
@@ -360,27 +362,15 @@
         // Seleccionar un viaje
         function selectRide(rideId) {
             selectedRideId = rideId;
-            const ride = pendingRidesData[rideId];
-            if (!ride) return;
-
             document.getElementById('selected-request').style.display = 'block';
-            document.getElementById('selected-dest').innerHTML = `
-                <strong>Destino:</strong> ${ride.dropoff_lat.toFixed(4)}, ${ride.dropoff_lng.toFixed(4)}<br>
-                <strong>Distancia:</strong> ${getDistanceFromLatLonInKm(currentPosition.lat, currentPosition.lng, ride.pickup_lat, ride.pickup_lng).toFixed(1)} km
-            `;
-
-            // Resaltar marcador (opcional)
-            updateRequestsList(); // para marcar el selected
+            document.getElementById('selected-dest').innerText = `ID: ${rideId}`;
+            // Opcional: resaltar marcador
         }
 
-        // Aceptar el viaje seleccionado
+        // Aceptar viaje
         async function acceptRide() {
             if (!selectedRideId || !currentUser) return;
 
-            const ride = pendingRidesData[selectedRideId];
-            if (!ride) return;
-
-            // Actualizar el viaje en la base de datos
             const { error } = await supabase
                 .from('rides')
                 .update({ driver_id: currentUser.id, status: 'accepted' })
@@ -392,14 +382,12 @@
                 return;
             }
 
-            // Remover marcador y datos
+            // Remover marcador y de la lista
             if (pendingMarkers[selectedRideId]) {
                 map.removeLayer(pendingMarkers[selectedRideId]);
                 delete pendingMarkers[selectedRideId];
             }
-            delete pendingRidesData[selectedRideId];
 
-            // Ocultar panel de selección
             document.getElementById('selected-request').style.display = 'none';
             selectedRideId = null;
             updateRequestsList();
@@ -407,7 +395,7 @@
             alert('Viaje aceptado! Dirígete al punto de encuentro.');
         }
 
-        // Utilidad: calcular distancia (Haversine)
+        // ================== UTILIDADES ==================
         function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = deg2rad(lat2 - lat1);
@@ -421,25 +409,21 @@
         }
         function deg2rad(deg) { return deg * (Math.PI/180); }
 
-        // Verificar sesión al cargar
+        // ================== AUTENTICACIÓN ==================
         async function checkUser() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 currentUser = session.user;
                 initMap();
-                // Intentar obtener ubicación inicial
+                // Obtener ubicación inicial
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         (pos) => {
                             currentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                             driverMarker.setLatLng([currentPosition.lat, currentPosition.lng]);
                             map.setView([currentPosition.lat, currentPosition.lng], 16);
-                            document.getElementById('driver-coords').innerText = `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
                         },
-                        (err) => {
-                            console.warn('Error obteniendo ubicación inicial', err);
-                            document.getElementById('driver-coords').innerText = 'Ubicación no disponible';
-                        }
+                        (err) => console.warn('Error obteniendo ubicación inicial', err)
                     );
                 }
             } else {
@@ -454,9 +438,10 @@
             window.location.href = 'index.html';
         }
 
-        // Event listeners
+        // ================== EVENT LISTENERS ==================
         document.getElementById('toggle-availability').addEventListener('click', toggleAvailability);
 
+        // Cargar al inicio
         window.onload = checkUser;
     </script>
 </body>
