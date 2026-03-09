@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MotoRide Conductor</title>
+    <title>MotoRide - Conductor</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -12,27 +12,6 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; height: 100vh; background: #000; }
-        
-        /* --- Pantalla de login --- */
-        #login-screen {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; background: #ffffff; padding: 30px; box-sizing: border-box;
-        }
-        #login-screen h1 { font-size: 32px; font-weight: 800; color: #111827; margin-bottom: 5px; }
-        #login-screen p { color: #6b7280; margin-bottom: 30px; }
-        .input-group { width: 100%; max-width: 350px; margin-bottom: 15px; }
-        input { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #e5e7eb; background-color: #f3f4f6; font-size: 16px; box-sizing: border-box; }
-        input:focus { outline: none; border-color: #000; background-color: #fff; }
-        
-        .btn-primary {
-            width: 100%; padding: 18px; background: #000; color: #fff; font-weight: 600;
-            border: none; border-radius: 12px; font-size: 17px; cursor: pointer; transition: transform 0.1s;
-        }
-        .btn-primary:active { transform: scale(0.97); }
-        #msg { color: #ef4444; font-size: 14px; margin-top: 15px; text-align: center; }
-
-        /* --- Pantalla principal del conductor --- */
-        #app-screen { display: none; height: 100vh; width: 100vw; position: relative; }
         #map { height: 100%; width: 100%; z-index: 1; }
         
         .driver-panel {
@@ -82,116 +61,63 @@
         .btn-logout {
             background: transparent; color: #6b7280; border: none;
             margin-top: 20px; padding: 12px; cursor: pointer;
+            width: 100%;
         }
     </style>
 </head>
 <body>
-
-    <!-- Pantalla de login para conductores -->
-    <div id="login-screen">
-        <h1>MotoRide Conductor</h1>
-        <p>Accede a tu cuenta de conductor</p>
-        <div class="input-group"><input type="email" id="email" placeholder="Correo electrónico"></div>
-        <div class="input-group"><input type="password" id="password" placeholder="Contraseña"></div>
-        <button class="btn-primary" onclick="handleLogin()" id="login-btn">Continuar</button>
-        <p id="msg"></p>
-    </div>
-
-    <!-- Pantalla principal de la app conductor -->
-    <div id="app-screen">
-        <div id="map"></div>
+    <div id="map"></div>
+    
+    <div class="driver-panel">
+        <div class="drag-handle"></div>
         
-        <div class="driver-panel">
-            <div class="drag-handle"></div>
-            
-            <div class="status-row">
-                <div class="status-badge">
-                    <span class="dot" id="status-dot"></span>
-                    <span id="status-text">Desactivado</span>
-                </div>
-                <button class="toggle-btn off" id="toggle-availability">Activar Disponibilidad</button>
+        <div class="status-row">
+            <div class="status-badge">
+                <span class="dot" id="status-dot"></span>
+                <span id="status-text">Desactivado</span>
             </div>
-
-            <div id="active-panel" style="display: none;">
-                <div class="info-card">
-                    <h4>📍 Tu ubicación</h4>
-                    <p id="driver-coords">Esperando GPS...</p>
-                </div>
-
-                <div id="requests-container">
-                    <h4 style="margin-bottom: 10px;">🛵 Viajes cercanos (radio 5 km)</h4>
-                    <div id="requests-list">
-                        <p style="color: #9ca3af; text-align: center;">No hay viajes cercanos</p>
-                    </div>
-                </div>
-
-                <div id="selected-request" style="display: none;" class="info-card">
-                    <h4>✅ Viaje seleccionado</h4>
-                    <p id="selected-dest"></p>
-                    <button class="btn-accept" onclick="acceptRide()">Aceptar viaje</button>
-                </div>
-            </div>
-
-            <button class="btn-logout" onclick="logout()">Cerrar Sesión</button>
+            <button class="toggle-btn off" id="toggle-availability">Activar Disponibilidad</button>
         </div>
+
+        <div id="active-panel" style="display: none;">
+            <div class="info-card">
+                <h4>📍 Tu ubicación</h4>
+                <p id="driver-coords">Esperando GPS...</p>
+            </div>
+
+            <div id="requests-container">
+                <h4 style="margin-bottom: 10px;">🛵 Viajes cercanos (radio 5 km)</h4>
+                <div id="requests-list">
+                    <p style="color: #9ca3af; text-align: center;">No hay viajes cercanos</p>
+                </div>
+            </div>
+
+            <div id="selected-request" style="display: none;" class="info-card">
+                <h4>✅ Viaje seleccionado</h4>
+                <p id="selected-dest"></p>
+                <button class="btn-accept" onclick="acceptRide()">Aceptar viaje</button>
+            </div>
+        </div>
+
+        <button class="btn-logout" onclick="logout()">Cerrar Sesión</button>
     </div>
 
     <script>
-        // Configuración de Supabase (mismas credenciales)
+        // Configuración de Supabase (tus credenciales)
         const SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZ2RjemV6eW1hYWxjbndiZmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDU1NjgsImV4cCI6MjA4ODYyMTU2OH0.fyM-HOvnH8_XofOqjAyRe604m7EkodKDkhXqzhG7R_o';
         const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Variables globales
         let map;
         let driverMarker;
         let pendingMarkers = {}; // { rideId: marker }
         let watchId = null;
         let currentUser = null;
         let driverActive = false;
-        let currentPosition = { lat: 10.1620, lng: -68.0077 }; // fallback Valencia
+        let currentPosition = { lat: 10.1620, lng: -68.0077 }; // fallback
         let selectedRideId = null;
         let ridesSubscription = null;
-
-        // Función para iniciar sesión (similar al index pero con mensaje conductor)
-        async function handleLogin() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const msg = document.getElementById('msg');
-            const loginBtn = document.getElementById('login-btn');
-            
-            if(!email || !password) return msg.innerText = "Completa todos los campos."; 
-            
-            loginBtn.disabled = true;
-            msg.innerText = "Cargando...";
-
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) {
-                // Si el usuario no existe, intentamos registrarlo
-                if (error.message.includes('Invalid login credentials')) {
-                    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
-                    if (signUpError) {
-                        msg.innerText = signUpError.message;
-                    } else {
-                        msg.innerText = "Cuenta creada. Ahora inicia sesión con tu contraseña.";
-                        msg.style.color = "#10b981";
-                    }
-                } else {
-                    msg.innerText = error.message;
-                }
-            } else {
-                currentUser = data.user;
-                msg.innerText = "";
-                mostrarApp();
-            }
-            loginBtn.disabled = false;
-        }
-
-        function mostrarApp() {
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app-screen').style.display = 'block';
-            initMap();
-        }
+        let pendingRidesData = {}; // guardar datos completos de viajes
 
         // Inicializar mapa
         function initMap() {
@@ -208,42 +134,26 @@
                 iconAnchor: [13, 13]
             });
             driverMarker = L.marker([currentPosition.lat, currentPosition.lng], { icon: driverIcon }).addTo(map);
-
-            // Intentar obtener ubicación real
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        currentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                        driverMarker.setLatLng([currentPosition.lat, currentPosition.lng]);
-                        map.setView([currentPosition.lat, currentPosition.lng], 16);
-                        document.getElementById('driver-coords').innerText = `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
-                    },
-                    (err) => {
-                        console.warn('Error obteniendo ubicación inicial', err);
-                        document.getElementById('driver-coords').innerText = 'Usando ubicación por defecto';
-                    }
-                );
-            }
         }
 
-        // Actualizar ubicación del conductor (llamado por watchPosition)
+        // Actualizar ubicación del conductor
         function updateDriverPosition(position) {
             const { latitude, longitude } = position.coords;
             currentPosition = { lat: latitude, lng: longitude };
             
             driverMarker.setLatLng([latitude, longitude]);
-            // No centramos el mapa automáticamente para no molestar al conductor si está explorando
-            // pero podemos actualizar el panel
+            map.panTo([latitude, longitude]);
+
             document.getElementById('driver-coords').innerText = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
 
             if (driverActive && currentUser) {
                 updateDriverLocationInDB(latitude, longitude);
-                // Al cambiar la ubicación, podríamos recargar viajes cercanos, pero para eficiencia lo hacemos cada cierto tiempo o cuando se activa.
-                // Por simplicidad, no recargamos automáticamente, pero podríamos llamar a loadNearbyPendingRides() aquí.
+                // Al actualizar ubicación, refrescar viajes cercanos (opcional)
+                loadNearbyPendingRides();
             }
         }
 
-        // Guardar ubicación en tabla driver_locations (versión con lat/lng)
+        // Guardar ubicación del conductor en Supabase (versión con lat/lng)
         async function updateDriverLocationInDB(lat, lng) {
             const { data: existing } = await supabase
                 .from('driver_locations')
@@ -259,13 +169,16 @@
             } else {
                 await supabase
                     .from('driver_locations')
-                    .insert({ driver_id: currentUser.id, lat: lat, lng: lng, is_active: driverActive });
+                    .insert({ driver_id: currentUser.id, lat: lat, lng: lng, is_active: true });
             }
         }
 
         // Activar/desactivar disponibilidad
         async function toggleAvailability() {
-            if (!currentUser) return;
+            if (!currentUser) {
+                alert('Debes iniciar sesión primero');
+                return;
+            }
 
             driverActive = !driverActive;
             const toggleBtn = document.getElementById('toggle-availability');
@@ -285,15 +198,18 @@
                 if (!watchId && navigator.geolocation) {
                     watchId = navigator.geolocation.watchPosition(
                         updateDriverPosition,
-                        (error) => console.warn('Error GPS:', error),
+                        (error) => {
+                            console.warn('Error GPS:', error);
+                            document.getElementById('driver-coords').innerText = 'Error obteniendo ubicación';
+                        },
                         { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
                     );
                 }
 
-                // Guardar ubicación actual y marcar activo en DB
+                // Si ya tenemos posición, guardar inmediatamente
                 if (currentPosition) {
                     await updateDriverLocationInDB(currentPosition.lat, currentPosition.lng);
-                    // Asegurar que is_active = true
+                    // Marcar como activo
                     await supabase
                         .from('driver_locations')
                         .update({ is_active: true })
@@ -303,7 +219,7 @@
                 // Cargar viajes pendientes cercanos
                 await loadNearbyPendingRides();
 
-                // Suscribirse a nuevos viajes pendientes
+                // Suscribirse a nuevos viajes
                 subscribeToNewRides();
             } else {
                 // Desactivar
@@ -335,26 +251,35 @@
                 // Limpiar marcadores de viajes
                 Object.values(pendingMarkers).forEach(m => map.removeLayer(m));
                 pendingMarkers = {};
+                pendingRidesData = {};
                 updateRequestsList();
             }
         }
 
-        // Suscribirse a nuevos viajes (INSERT en rides con status pending)
+        // Suscribirse a cambios en la tabla rides (nuevos pending)
         function subscribeToNewRides() {
             ridesSubscription = supabase
                 .channel('rides-pending')
                 .on('postgres_changes', 
                     { event: 'INSERT', schema: 'public', table: 'rides', filter: 'status=eq.pending' },
                     (payload) => {
-                        console.log('Nuevo viaje pendiente:', payload.new);
-                        // Al recibir un nuevo viaje, lo agregamos si está cerca
-                        addRideMarker(payload.new);
+                        const ride = payload.new;
+                        // Verificar si está cerca
+                        if (currentPosition) {
+                            const dist = getDistanceFromLatLonInKm(
+                                currentPosition.lat, currentPosition.lng,
+                                ride.pickup_lat, ride.pickup_lng
+                            );
+                            if (dist <= 5) {
+                                addRideMarker(ride);
+                            }
+                        }
                     }
                 )
                 .subscribe();
         }
 
-        // Cargar viajes pendientes cercanos (los que no tienen driver_id)
+        // Cargar viajes pendientes cercanos
         async function loadNearbyPendingRides() {
             if (!currentUser || !driverActive) return;
 
@@ -372,29 +297,29 @@
             // Limpiar marcadores anteriores
             Object.values(pendingMarkers).forEach(m => map.removeLayer(m));
             pendingMarkers = {};
+            pendingRidesData = {};
 
             rides.forEach(ride => {
-                addRideMarker(ride);
+                if (currentPosition) {
+                    const dist = getDistanceFromLatLonInKm(
+                        currentPosition.lat, currentPosition.lng,
+                        ride.pickup_lat, ride.pickup_lng
+                    );
+                    if (dist <= 5) {
+                        addRideMarker(ride);
+                    }
+                }
             });
         }
 
-        // Añadir un marcador de viaje al mapa y a la lista (si está dentro del radio)
+        // Añadir un marcador de viaje al mapa y a la lista
         function addRideMarker(ride) {
             if (!driverActive) return;
 
-            // Calcular distancia si tenemos posición
-            if (currentPosition) {
-                const dist = getDistanceFromLatLonInKm(
-                    currentPosition.lat, currentPosition.lng,
-                    ride.pickup_lat, ride.pickup_lng
-                );
-                if (dist > 5) return; // fuera de radio 5 km
-            }
+            // Guardar datos completos
+            pendingRidesData[ride.id] = ride;
 
-            // Evitar duplicados
-            if (pendingMarkers[ride.id]) return;
-
-            // Crear marcador rojo para pasajero
+            // Crear marcador
             const passengerIcon = L.divIcon({
                 className: 'passenger-icon',
                 html: '<div style="background-color:#ef4444; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px #ef4444;"></div>',
@@ -410,7 +335,6 @@
 
             pendingMarkers[ride.id] = marker;
 
-            // Actualizar lista HTML
             updateRequestsList();
         }
 
@@ -424,43 +348,56 @@
 
             let html = '';
             Object.keys(pendingMarkers).forEach(rideId => {
-                html += `<div class="request-item" onclick="selectRide('${rideId}')">
+                const ride = pendingRidesData[rideId] || {};
+                html += `<div class="request-item ${selectedRideId === rideId ? 'selected' : ''}" onclick="selectRide('${rideId}')">
                     <strong>Viaje #${rideId.slice(0,6)}</strong><br>
-                    <small>📍 Pasajero cercano</small>
+                    <small>📍 A ${getDistanceFromLatLonInKm(currentPosition.lat, currentPosition.lng, ride.pickup_lat, ride.pickup_lng).toFixed(1)} km</small>
                 </div>`;
             });
             listDiv.innerHTML = html;
         }
 
-        // Seleccionar un viaje para aceptar
+        // Seleccionar un viaje
         function selectRide(rideId) {
             selectedRideId = rideId;
+            const ride = pendingRidesData[rideId];
+            if (!ride) return;
+
             document.getElementById('selected-request').style.display = 'block';
-            document.getElementById('selected-dest').innerText = `Viaje ID: ${rideId}`;
-            // Podríamos resaltar el marcador cambiando su icono
+            document.getElementById('selected-dest').innerHTML = `
+                <strong>Destino:</strong> ${ride.dropoff_lat.toFixed(4)}, ${ride.dropoff_lng.toFixed(4)}<br>
+                <strong>Distancia:</strong> ${getDistanceFromLatLonInKm(currentPosition.lat, currentPosition.lng, ride.pickup_lat, ride.pickup_lng).toFixed(1)} km
+            `;
+
+            // Resaltar marcador (opcional)
+            updateRequestsList(); // para marcar el selected
         }
 
         // Aceptar el viaje seleccionado
         async function acceptRide() {
             if (!selectedRideId || !currentUser) return;
 
-            // Actualizar el viaje: asignar driver_id y cambiar status a 'accepted'
+            const ride = pendingRidesData[selectedRideId];
+            if (!ride) return;
+
+            // Actualizar el viaje en la base de datos
             const { error } = await supabase
                 .from('rides')
                 .update({ driver_id: currentUser.id, status: 'accepted' })
                 .eq('id', selectedRideId)
-                .eq('status', 'pending'); // solo si sigue pending
+                .eq('status', 'pending');
 
             if (error) {
                 alert('Error al aceptar: ' + error.message);
                 return;
             }
 
-            // Remover marcador y de la lista
+            // Remover marcador y datos
             if (pendingMarkers[selectedRideId]) {
                 map.removeLayer(pendingMarkers[selectedRideId]);
                 delete pendingMarkers[selectedRideId];
             }
+            delete pendingRidesData[selectedRideId];
 
             // Ocultar panel de selección
             document.getElementById('selected-request').style.display = 'none';
@@ -468,12 +405,11 @@
             updateRequestsList();
 
             alert('Viaje aceptado! Dirígete al punto de encuentro.');
-            // Aquí podrías cambiar el estado a "en ruta" o mostrar instrucciones
         }
 
-        // Utilidad: calcular distancia entre dos coordenadas (fórmula de Haversine)
+        // Utilidad: calcular distancia (Haversine)
         function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Radio de la Tierra en km
+            const R = 6371;
             const dLat = deg2rad(lat2 - lat1);
             const dLon = deg2rad(lon2 - lon1);
             const a = 
@@ -485,24 +421,43 @@
         }
         function deg2rad(deg) { return deg * (Math.PI/180); }
 
-        // Cerrar sesión
-        async function logout() {
-            await supabase.auth.signOut();
-            window.location.reload(); // Vuelve a la pantalla de login
-        }
-
-        // Verificar sesión al cargar la página
-        window.onload = async function() {
+        // Verificar sesión al cargar
+        async function checkUser() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 currentUser = session.user;
-                mostrarApp();
+                initMap();
+                // Intentar obtener ubicación inicial
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            currentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                            driverMarker.setLatLng([currentPosition.lat, currentPosition.lng]);
+                            map.setView([currentPosition.lat, currentPosition.lng], 16);
+                            document.getElementById('driver-coords').innerText = `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
+                        },
+                        (err) => {
+                            console.warn('Error obteniendo ubicación inicial', err);
+                            document.getElementById('driver-coords').innerText = 'Ubicación no disponible';
+                        }
+                    );
+                }
+            } else {
+                // Redirigir al login (index.html)
+                window.location.href = 'index.html';
             }
-            // Si no hay sesión, se queda en login-screen
-        };
+        }
 
-        // Event listener para el botón de disponibilidad
+        // Logout
+        async function logout() {
+            await supabase.auth.signOut();
+            window.location.href = 'index.html';
+        }
+
+        // Event listeners
         document.getElementById('toggle-availability').addEventListener('click', toggleAvailability);
+
+        window.onload = checkUser;
     </script>
 </body>
 </html>
