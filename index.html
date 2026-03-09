@@ -43,41 +43,40 @@
             border: none; border-radius: 12px; font-size: 17px; cursor: pointer; transition: transform 0.1s;
         }
         .btn-primary:active { transform: scale(0.97); }
+        .btn-primary:disabled { opacity: 0.5; transform: none; cursor: not-allowed; }
 
         /* --- APP PRINCIPAL --- */
         #app-screen { display: none; height: 100vh; width: 100vw; position: relative; }
         
-        /* Contenedor del mapa y el Pin Central */
         #map-container { position: relative; height: 100%; width: 100%; z-index: 1; }
         #map { height: 100%; width: 100%; }
         
-        /* EL PIN DE UBER FIJO EN EL CENTRO */
         .center-marker {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -100%);
             z-index: 1000;
-            pointer-events: none; /* Permite arrastrar el mapa a través del icono */
-            display: none; /* Oculto hasta que se active elegir destino */
+            pointer-events: none;
+            display: none;
             font-size: 45px;
             text-shadow: 0 5px 10px rgba(0,0,0,0.3);
             transition: transform 0.2s;
         }
         
-        /* Animación cuando mueves el mapa (el pin "salta") */
         .center-marker.is-dragging { transform: translate(-50%, -120%); }
 
-        /* Panel Inferior */
         .bottom-sheet {
             position: absolute; bottom: 0; left: 0; right: 0;
             background: var(--bg-glass); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
             padding: 24px; border-radius: 30px 30px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.1);
             z-index: 1001; display: flex; flex-direction: column;
+            max-height: 50vh; overflow-y: auto;
         }
         .drag-handle { width: 40px; height: 5px; background-color: #d1d5db; border-radius: 10px; margin: 0 auto 20px auto; }
         
         .location-status { display: flex; align-items: center; font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
         .location-status .dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+        .location-status .dot.warning { background-color: #f59e0b; }
         h3 { margin: 0 0 15px 0; font-size: 22px; font-weight: 700; color: var(--text-main); }
 
         .btn-secondary {
@@ -86,8 +85,9 @@
         }
         
         .ride-status-card { display: none; background: #fff; border: 1px solid #f3f4f6; padding: 16px; border-radius: 16px; margin-top: 15px; text-align: center; }
-        .btn-logout { background: transparent; color: var(--text-muted); font-size: 14px; margin-top: 20px; padding: 10px; border: none; }
+        .btn-logout { background: transparent; color: var(--text-muted); font-size: 14px; margin-top: 20px; padding: 10px; border: none; width: 100%; cursor: pointer; }
         .leaflet-bottom.leaflet-right { bottom: 350px !important; }
+        .address-text { font-weight: 600; color: var(--text-main); font-size: 16px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -97,7 +97,7 @@
         <p>Tu viaje a un toque de distancia</p>
         <div class="input-group"><input type="email" id="email" placeholder="Correo electrónico"></div>
         <div class="input-group"><input type="password" id="password" placeholder="Contraseña"></div>
-        <button class="btn-primary" onclick="handleLogin()">Continuar</button>
+        <button class="btn-primary" onclick="handleLogin()" id="login-btn">Continuar</button>
         <p id="msg" style="color: #ef4444; font-size: 14px; margin-top: 15px; text-align: center;"></p>
     </div>
 
@@ -112,7 +112,7 @@
             
             <div class="location-status">
                 <div class="dot" id="dot-status"></div>
-                <span id="user-status">Ubicación lista</span>
+                <span id="user-status">Obteniendo ubicación...</span>
             </div>
 
             <div id="panel-inicial">
@@ -122,14 +122,15 @@
 
             <div id="panel-confirmar" style="display: none;">
                 <h3 style="font-size: 18px;">Mueve el mapa para ajustar</h3>
-                <button class="btn-primary" onclick="confirmarDestino()" style="background: #10b981;">✅ Confirmar Destino</button>
+                <button class="btn-primary" onclick="confirmarDestino()" id="confirmar-btn" style="background: #10b981;">✅ Confirmar Destino</button>
                 <button class="btn-secondary" onclick="cancelarSeleccion()" style="margin-top: 10px; padding: 12px;">Cancelar</button>
             </div>
             
             <div id="panel-pedir" style="display: none;">
                 <h3 style="font-size: 18px;">Destino seleccionado</h3>
-                <p id="coords-text" style="color: var(--text-muted); font-size: 12px; margin-bottom: 15px;">Lat: 0, Lng: 0</p>
-                <button class="btn-primary" onclick="pedirMoto()">🛵 Solicitar Moto</button>
+                <div id="dest-address" class="address-text">Obteniendo dirección...</div>
+                <p id="coords-text" style="color: var(--text-muted); font-size: 12px; margin-bottom: 15px;"></p>
+                <button class="btn-primary" onclick="pedirMoto()" id="pedir-btn">🛵 Solicitar Moto</button>
                 <button class="btn-secondary" onclick="cancelarSeleccion()" style="margin-top: 10px; padding: 12px;">Cambiar destino</button>
             </div>
 
@@ -144,44 +145,73 @@
     </div>
 
     <script>
-        // CONFIGURACIÓN DE SUPABASE
+        // CONFIGURACIÓN DE SUPABASE (con tu URL y KEY)
         const SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
-        const SUPABASE_KEY = 'TU_CLAVE_AQUI'; // Asegúrate de colocar tu clave real aquí
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZ2RjemV6eW1hYWxjbndiZmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDU1NjgsImV4cCI6MjA4ODYyMTU2OH0.fyM-HOvnH8_XofOqjAyRe604m7EkodKDkhXqzhG7R_o';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let map = null;
         let userMarker = null;
-        let destinationMarker = null; // Para guardar el marcador final
+        let destinationMarker = null;
         let currentUser = null;
         let currentRide = null;
         
-        // Variables para guardar las coordenadas
-        let userLat = 0, userLng = 0;
+        // Variables de coordenadas
+        let userLat = 10.1620;  // fallback Valencia
+        let userLng = -68.0077;
         let destLat = 0, destLng = 0;
 
+        // Para controlar estado de geolocalización
+        let locationKnown = false;
+
+        // Inicializar mapa
         function initMap() {
-            // Centrado inicial en Valencia
-            map = L.map('map', { zoomControl: false }).setView([10.1620, -68.0077], 14);
+            map = L.map('map', { zoomControl: false }).setView([userLat, userLng], 14);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
+            // Intentar obtener ubicación real
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((position) => {
-                    userLat = position.coords.latitude;
-                    userLng = position.coords.longitude;
-                    
-                    map.flyTo([userLat, userLng], 16, { animate: true, duration: 1.5 });
-                    
-                    const userIcon = L.divIcon({
-                        className: 'custom-div-icon',
-                        html: "<div style='background-color:#3b82f6; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);'></div>",
-                        iconSize: [22, 22], iconAnchor: [11, 11]
-                    });
-
-                    userMarker = L.marker([userLat, userLng], {icon: userIcon}).addTo(map);
-                });
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLat = position.coords.latitude;
+                        userLng = position.coords.longitude;
+                        locationKnown = true;
+                        document.getElementById('dot-status').classList.remove('warning');
+                        document.getElementById('user-status').innerText = 'Ubicación lista';
+                        
+                        map.flyTo([userLat, userLng], 16, { animate: true, duration: 1.5 });
+                        
+                        // Actualizar o crear marcador de usuario
+                        if (userMarker) {
+                            userMarker.setLatLng([userLat, userLng]);
+                        } else {
+                            const userIcon = L.divIcon({
+                                className: 'custom-div-icon',
+                                html: "<div style='background-color:#3b82f6; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);'></div>",
+                                iconSize: [22, 22], iconAnchor: [11, 11]
+                            });
+                            userMarker = L.marker([userLat, userLng], {icon: userIcon}).addTo(map);
+                        }
+                    },
+                    (error) => {
+                        console.warn('Error de geolocalización:', error);
+                        document.getElementById('dot-status').classList.add('warning');
+                        document.getElementById('user-status').innerText = 'Usando ubicación por defecto (Valencia)';
+                        locationKnown = false;
+                        // Mostramos marcador en la ubicación por defecto
+                        const userIcon = L.divIcon({
+                            className: 'custom-div-icon',
+                            html: "<div style='background-color:#f59e0b; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow: 0 0 10px rgba(245, 158, 11, 0.8);'></div>",
+                            iconSize: [22, 22], iconAnchor: [11, 11]
+                        });
+                        userMarker = L.marker([userLat, userLng], {icon: userIcon}).addTo(map);
+                    }
+                );
+            } else {
+                document.getElementById('user-status').innerText = 'Geolocalización no soportada';
             }
 
             // Efectos visuales al mover el mapa
@@ -196,29 +226,41 @@
             });
         }
 
-        // --- LÓGICA DE SELECCIÓN DE DESTINO --- //
-        
+        // --- Geocodificación inversa (OpenStreetMap Nominatim) ---
+        async function getAddressFromCoords(lat, lng) {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+                    headers: { 'User-Agent': 'MotoRide-App/1.0' } // Requerido por Nominatim
+                });
+                const data = await response.json();
+                return data.display_name || 'Dirección no encontrada';
+            } catch (e) {
+                console.error('Error en geocodificación:', e);
+                return 'Dirección no disponible';
+            }
+        }
+
+        // --- LÓGICA DE SELECCIÓN DE DESTINO ---
         function activarSeleccionMapa() {
             document.getElementById('panel-inicial').style.display = 'none';
             document.getElementById('panel-confirmar').style.display = 'block';
             document.getElementById('center-marker').style.display = 'block';
             
-            // Si ya había un marcador de destino previo, lo borramos
             if (destinationMarker) {
                 map.removeLayer(destinationMarker);
                 destinationMarker = null;
             }
         }
 
-        function confirmarDestino() {
-            // Obtenemos las coordenadas exactas del centro del mapa en este momento
+        async function confirmarDestino() {
             const center = map.getCenter();
             destLat = center.lat;
             destLng = center.lng;
 
-            // Ocultamos el pin flotante y colocamos un pin real de Leaflet en esa posición
+            // Ocultar pin flotante
             document.getElementById('center-marker').style.display = 'none';
             
+            // Colocar marcador real
             const destIcon = L.divIcon({
                 className: 'custom-dest-icon',
                 html: "<div style='font-size:30px; margin-top:-30px; text-shadow: 0 4px 6px rgba(0,0,0,0.4);'>📍</div>",
@@ -227,12 +269,17 @@
             
             destinationMarker = L.marker([destLat, destLng], {icon: destIcon}).addTo(map);
 
-            // Cambiamos la interfaz al panel de pedir moto
+            // Mostrar panel de pedir con dirección
             document.getElementById('panel-confirmar').style.display = 'none';
             document.getElementById('panel-pedir').style.display = 'block';
             
-            // Mostrar coordenadas abreviadas (En un futuro aquí puedes poner una API que diga "Calle Bolívar")
+            // Mostrar coordenadas
             document.getElementById('coords-text').innerText = `Lat: ${destLat.toFixed(4)}, Lng: ${destLng.toFixed(4)}`;
+            
+            // Obtener y mostrar dirección aproximada
+            document.getElementById('dest-address').innerText = 'Obteniendo dirección...';
+            const address = await getAddressFromCoords(destLat, destLng);
+            document.getElementById('dest-address').innerText = address;
         }
 
         function cancelarSeleccion() {
@@ -247,25 +294,38 @@
             }
         }
 
-        // --- RESTO DE FUNCIONES (LOGIN Y PEDIR MOTO) --- //
-
+        // --- AUTENTICACIÓN Y VIAJES ---
         async function handleLogin() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const msg = document.getElementById('msg');
+            const loginBtn = document.getElementById('login-btn');
+            
             if(!email || !password) return msg.innerText = "Completa todos los campos."; 
+            
+            loginBtn.disabled = true;
             msg.innerText = "Cargando...";
 
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
             if (error) {
-                const signUpResult = await supabaseClient.auth.signUp({ email, password });
-                if (signUpResult.error) { msg.innerText = signUpResult.error.message; } 
-                else { msg.innerText = "Cuenta creada. Inicia sesión."; msg.style.color = "#10b981"; }
+                // Si el usuario no existe, intentamos registrarlo
+                if (error.message.includes('Invalid login credentials')) {
+                    const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({ email, password });
+                    if (signUpError) {
+                        msg.innerText = signUpError.message;
+                    } else {
+                        msg.innerText = "Cuenta creada. Ahora inicia sesión con tu contraseña.";
+                        msg.style.color = "#10b981";
+                    }
+                } else {
+                    msg.innerText = error.message;
+                }
             } else {
                 currentUser = data.user;
                 msg.innerText = "";
                 mostrarApp();
             }
+            loginBtn.disabled = false;
         }
 
         function mostrarApp() {
@@ -277,17 +337,28 @@
             }, 400);
         }
 
-        async function logout() { await supabaseClient.auth.signOut(); location.reload(); }
+        async function logout() {
+            await supabaseClient.auth.signOut();
+            location.reload();
+        }
 
         async function pedirMoto() {
+            if (!locationKnown) {
+                if (!confirm('No tenemos tu ubicación exacta. ¿Quieres continuar con la ubicación aproximada (Valencia)?')) {
+                    return;
+                }
+            }
+
             const rideInfo = document.getElementById('ride-info');
             const rideStatus = document.getElementById('ride-status');
+            const pedirBtn = document.getElementById('pedir-btn');
             
             document.getElementById('panel-pedir').style.display = 'none';
             rideInfo.style.display = 'block';
             rideStatus.innerText = "Conectando con la base de datos...";
+            pedirBtn.disabled = true;
 
-            // Guardamos el viaje en Supabase con las coordenadas de Origen y Destino
+            // Insertar viaje en Supabase
             const { data, error } = await supabaseClient
                 .from('rides')
                 .insert([{ 
@@ -300,13 +371,18 @@
                 }])
                 .select();
 
+            pedirBtn.disabled = false;
+
             if (error) {
                 rideStatus.innerText = "Error: " + error.message;
                 rideStatus.style.color = "#ef4444";
+                console.error(error);
             } else {
                 currentRide = data[0];
                 rideStatus.innerText = "Buscando conductor cercano...";
+                rideStatus.style.color = "var(--text-muted)";
                 
+                // Simulación de asignación de conductor (en una app real esto vendría de un subscription)
                 setTimeout(() => {
                     rideStatus.innerText = "¡Conductor en camino!";
                     rideStatus.style.color = "#10b981";
@@ -314,9 +390,13 @@
             }
         }
 
+        // Comprobar si ya hay sesión activa al cargar la página
         window.onload = async function() {
             const { data } = await supabaseClient.auth.getSession();
-            if (data.session) { currentUser = data.session.user; mostrarApp(); }
+            if (data.session) { 
+                currentUser = data.session.user; 
+                mostrarApp(); 
+            }
         };
     </script>
 </body>
