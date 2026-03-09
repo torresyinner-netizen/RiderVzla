@@ -2,165 +2,353 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MotoRide - Tu transporte rápido</title>
     
-    <!-- Estilos CSS (Diseño) -->
-    <style>
-        :root {
-            --primary: #FFD700;
-            --dark: #1a1a1a;
-            --light: #f4f4f4;
-        }
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--light); }
-        
-        #login-screen {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; background: var(--dark); color: white; padding: 20px;
-        }
-        input {
-            padding: 15px; width: 80%; margin: 10px 0; border-radius: 8px; border: none;
-        }
-        button {
-            padding: 15px; width: 80%; background: var(--primary); color: var(--dark);
-            font-weight: bold; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;
-        }
-        button:active { transform: scale(0.98); }
-
-        #app-screen { display: none; height: 100vh; position: relative; }
-        #map { height: 100%; width: 100%; }
-        
-        .bottom-panel {
-            position: absolute; bottom: 0; left: 0; right: 0;
-            background: white; padding: 20px; border-radius: 20px 20px 0 0;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
-        }
-        .status-badge {
-            background: #eee; padding: 5px 10px; border-radius: 15px; font-size: 12px;
-            display: inline-block; margin-bottom: 10px;
-        }
-        .ride-info {
-            background: #fff3cd; padding: 10px; border-radius: 8px; margin-top: 10px;
-            display: none;
-        }
-    </style>
-
-    <!-- Librería de Mapas (Leaflet) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Librería de Supabase (Versión Web) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #000000;
+            --secondary: #f3f4f6;
+            --accent: #FFD700;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --bg-glass: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Tipografía estilo iOS */
+        body, input, button {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: #000;
+            overflow: hidden; /* Evita el scroll en web móvil */
+        }
+
+        /* --- PANTALLA DE LOGIN --- */
+        #login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #ffffff;
+            padding: 30px;
+            box-sizing: border-box;
+            transition: opacity 0.4s ease;
+        }
+
+        #login-screen h1 {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 5px;
+        }
+
+        #login-screen p {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            width: 100%;
+            max-width: 350px;
+            margin-bottom: 15px;
+        }
+
+        input {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            background-color: var(--secondary);
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background-color: #fff;
+        }
+
+        .btn-primary {
+            width: 100%;
+            max-width: 350px;
+            padding: 18px;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.97);
+            opacity: 0.9;
+        }
+
+        /* --- APP PRINCIPAL --- */
+        #app-screen {
+            display: none;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Panel Inferior (Bottom Sheet iOS) */
+        .bottom-sheet {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-glass);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            padding: 24px;
+            border-radius: 30px 30px 0 0;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transform: translateY(0);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* El "grabber" o línea superior del panel */
+        .drag-handle {
+            width: 40px;
+            height: 5px;
+            background-color: #d1d5db;
+            border-radius: 10px;
+            margin: 0 auto 20px auto;
+        }
+
+        .location-status {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .location-status .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+        }
+
+        h3 {
+            margin: 0 0 15px 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .destination-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .destination-container input {
+            padding-left: 45px;
+            background-color: #f9fafb;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .destination-container::before {
+            content: "📍";
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+        }
+
+        .ride-status-card {
+            display: none;
+            background: #fff;
+            border: 1px solid #f3f4f6;
+            padding: 16px;
+            border-radius: 16px;
+            margin-top: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .btn-logout {
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-top: 20px;
+            padding: 10px;
+            border: none;
+        }
+        
+        /* Controles del mapa Leaflet (reubicarlos para que no los tape el panel) */
+        .leaflet-bottom.leaflet-right {
+            bottom: 300px !important;
+        }
+    </style>
 </head>
 <body>
 
-    <!-- PANTALLA 1: LOGIN -->
     <div id="login-screen">
-        <h1>🏍️ MotoRide</h1>
-        <p>Ingresa para pedir tu moto</p>
-        <input type="email" id="email" placeholder="Correo electrónico">
-        <input type="password" id="password" placeholder="Contraseña">
-        <button onclick="handleLogin()">Entrar / Registrarse</button>
-        <p id="msg" style="color: #ff6b6b; font-size: 12px;"></p>
+        <h1>MotoRide</h1>
+        <p>Tu viaje a un toque de distancia</p>
+        
+        <div class="input-group">
+            <input type="email" id="email" placeholder="Correo electrónico">
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" placeholder="Contraseña">
+        </div>
+        
+        <button class="btn-primary" onclick="handleLogin()">Continuar</button>
+        <p id="msg" style="color: #ef4444; font-size: 14px; margin-top: 15px; text-align: center;"></p>
     </div>
 
-    <!-- PANTALLA 2: APP PRINCIPAL -->
     <div id="app-screen">
         <div id="map"></div>
         
-        <div class="bottom-panel">
-            <span class="status-badge" id="user-status">📍 Obteniendo ubicación...</span>
-            <h3>¿A dónde vamos?</h3>
-            <input type="text" id="destino" placeholder="Ej: Parque Central, Centro Comercial..." style="width: 90%; margin: 0;">
-            <br><br>
-            <button onclick="pedirMoto()">🛵 PEDIR MOTO AHORA</button>
-            <div id="ride-info" class="ride-info">
-                <strong>Estado:</strong> <span id="ride-status">Buscando conductor...</span>
+        <div class="bottom-sheet">
+            <div class="drag-handle"></div>
+            
+            <div class="location-status">
+                <div class="dot" id="dot-status"></div>
+                <span id="user-status">Buscando tu ubicación...</span>
             </div>
-            <button onclick="logout()" style="background: #ccc; margin-top: 10px;">Cerrar Sesión</button>
+
+            <h3>¿A dónde vas?</h3>
+            <div class="destination-container">
+                <input type="text" id="destino" placeholder="Buscar destino...">
+            </div>
+            
+            <button class="btn-primary" onclick="pedirMoto()">Solicitar Moto</button>
+            
+            <div id="ride-info" class="ride-status-card">
+                <div style="font-size: 24px; margin-bottom: 5px;">🛵</div>
+                <strong style="color: var(--text-main);">Estado del viaje</strong>
+                <p id="ride-status" style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 14px;">Buscando conductor cercano...</p>
+            </div>
+
+            <button class="btn-logout" onclick="logout()">Cerrar Sesión</button>
         </div>
     </div>
 
-    <!-- LÓGICA JAVASCRIPT -->
     <script>
-        // 1. CONFIGURACIÓN DE SUPABASE (TUS CREDENCIALES)
-        var SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
-        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZ2RjemV6eW1hYWxjbndiZmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDU1NjgsImV4cCI6MjA4ODYyMTU2OH0.fyM-HOvnH8_XofOqjAyRe604m7EkodKDkhXqzhG7R_o';
+        // CONFIGURACIÓN DE SUPABASE
+        const SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
+        const SUPABASE_KEY = 'TU_CLAVE_AQUI'; // Asegúrate de colocar tu clave real aquí
         
-        // Crear cliente de Supabase
-        var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        var map = null;
-        var userMarker = null;
-        var currentUser = null;
-        var currentRide = null;
+        let map = null;
+        let userMarker = null;
+        let currentUser = null;
+        let currentRide = null;
 
-        // 2. INICIALIZAR MAPA
+        // INICIALIZAR MAPA
         function initMap() {
-            // Coordenadas por defecto (Ciudad de México - CAMBIA ESTO A TU CIUDAD)
-            map = L.map('map').setView([19.4326, -99.1332], 13);
+            // Coordenadas iniciales (Centro de Valencia) mientras el GPS carga
+            map = L.map('map', { zoomControl: false }).setView([10.1620, -68.0077], 14);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
-            // Obtener ubicación real del usuario
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    var lat = position.coords.latitude;
-                    var lng = position.coords.longitude;
-                    map.setView([lat, lng], 15);
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
                     
-                    userMarker = L.marker([lat, lng]).addTo(map)
-                        .bindPopup("📍 Tú estás aquí").openPopup();
-                    document.getElementById('user-status').innerText = "✅ Ubicación detectada";
-                    document.getElementById('user-status').style.background = "#d1fae5";
-                }, function() {
-                    document.getElementById('user-status').innerText = "⚠️ Permiso de ubicación denegado";
+                    map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
+                    
+                    // Marcador personalizado estilo punto azul (iOS)
+                    const userIcon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: "<div style='background-color:#3b82f6; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);'></div>",
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11]
+                    });
+
+                    userMarker = L.marker([lat, lng], {icon: userIcon}).addTo(map);
+                    
+                    document.getElementById('user-status').innerText = "Ubicación actual precisa";
+                    document.getElementById('dot-status').style.backgroundColor = "#10b981"; // Verde
+                }, () => {
+                    document.getElementById('user-status').innerText = "No se pudo obtener la ubicación";
+                    document.getElementById('dot-status').style.backgroundColor = "#ef4444"; // Rojo
                 });
             }
         }
 
-        // 3. FUNCIONES DE LOGIN
+        // FUNCIONES DE LOGIN
         async function handleLogin() {
-            var email = document.getElementById('email').value;
-            var password = document.getElementById('password').value;
-            var msg = document.getElementById('msg');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const msg = document.getElementById('msg');
 
             if(!email || !password) { 
-                msg.innerText = "⚠️ Llena todos los campos"; 
+                msg.innerText = "Por favor, completa todos los campos."; 
                 return; 
             }
 
-            msg.innerText = "⏳ Procesando...";
+            msg.innerText = "Cargando...";
+            msg.style.color = "var(--text-muted)";
 
-            // Intentar iniciar sesión
-            var signInResult = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
-            // Si falla, intentar registrar
-            if (signInResult.error) {
-                var signUpResult = await supabaseClient.auth.signUp({ 
-                    email: email, 
-                    password: password,
+            if (error) {
+                const signUpResult = await supabaseClient.auth.signUp({ 
+                    email, password,
                     options: { data: { full_name: email.split('@')[0] } }
                 });
+                
                 if (signUpResult.error) { 
-                    msg.innerText = "❌ Error: " + signUpResult.error.message; 
+                    msg.innerText = signUpResult.error.message;
+                    msg.style.color = "#ef4444"; 
                 } else { 
-                    msg.innerText = "✅ ¡Cuenta creada! Revisa tu correo o inicia sesión."; 
-                    msg.style.color = "#4ade80"; 
+                    msg.innerText = "Cuenta creada. Por favor inicia sesión."; 
+                    msg.style.color = "#10b981"; 
                 }
             } else {
-                currentUser = signInResult.data.user;
+                currentUser = data.user;
                 msg.innerText = "";
                 mostrarApp();
             }
         }
 
         function mostrarApp() {
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app-screen').style.display = 'block';
-            initMap();
+            // Transición suave
+            document.getElementById('login-screen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-screen').style.display = 'block';
+                initMap();
+            }, 400);
         }
 
         async function logout() {
@@ -168,29 +356,29 @@
             location.reload();
         }
 
-        // 4. PEDIR VIAJE
+        // PEDIR VIAJE
         async function pedirMoto() {
-            var destino = document.getElementById('destino').value;
+            const destino = document.getElementById('destino').value;
             if(!destino) { 
-                alert("⚠️ Escribe un destino"); 
+                alert("Por favor, ingresa a dónde quieres ir."); 
                 return; 
             }
 
-            document.getElementById('ride-info').style.display = 'block';
-            document.getElementById('ride-status').innerText = "🔍 Buscando conductor cercano...";
+            const rideInfo = document.getElementById('ride-info');
+            const rideStatus = document.getElementById('ride-status');
+            
+            rideInfo.style.display = 'block';
+            rideStatus.innerText = "Conectando...";
+            rideStatus.style.color = "var(--text-muted)";
 
-            // Obtener coordenadas actuales
-            var pickupLat = 0, pickupLng = 0;
+            let pickupLat = 0, pickupLng = 0;
             if (navigator.geolocation) {
-                var pos = await new Promise(function(resolve) {
-                    navigator.geolocation.getCurrentPosition(resolve);
-                });
+                const pos = await new Promise(resolve => navigator.geolocation.getCurrentPosition(resolve));
                 pickupLat = pos.coords.latitude;
                 pickupLng = pos.coords.longitude;
             }
 
-            // Guardar el viaje en Supabase
-            var insertResult = await supabaseClient
+            const { data, error } = await supabaseClient
                 .from('rides')
                 .insert([{ 
                     passenger_id: currentUser.id, 
@@ -202,25 +390,27 @@
                 }])
                 .select();
 
-            if (insertResult.error) {
-                document.getElementById('ride-status').innerText = "❌ Error: " + insertResult.error.message;
+            if (error) {
+                rideStatus.innerText = "Error al solicitar: " + error.message;
+                rideStatus.style.color = "#ef4444";
             } else {
-                currentRide = insertResult.data[0];
-                document.getElementById('ride-status').innerText = "⏳ Viaje solicitado - Esperando conductor...";
+                currentRide = data[0];
+                rideStatus.innerText = "Buscando conductor cercano...";
                 
-                // Simular búsqueda de conductor (2 segundos)
-                setTimeout(function() {
-                    document.getElementById('ride-status').innerText = "🛵 ¡Conductor encontrado! En camino...";
-                    document.getElementById('ride-status').style.color = "#16a34a";
-                }, 2000);
+                // Simulación visual
+                setTimeout(() => {
+                    rideStatus.innerText = "¡Conductor en camino!";
+                    rideStatus.style.color = "#10b981";
+                    rideStatus.style.fontWeight = "bold";
+                }, 3000);
             }
         }
 
-        // 5. VERIFICAR SESIÓN AL CARGAR
+        // VERIFICAR SESIÓN
         window.onload = async function() {
-            var sessionResult = await supabaseClient.auth.getSession();
-            if (sessionResult.data.session) {
-                currentUser = sessionResult.data.session.user;
+            const { data } = await supabaseClient.auth.getSession();
+            if (data.session) {
+                currentUser = data.session.user;
                 mostrarApp();
             }
         };
