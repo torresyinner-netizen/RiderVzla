@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotoRide - Tu transporte rápido</title>
+    
+    <!-- Estilos CSS (Diseño) -->
+    <style>
+        :root {
+            --primary: #FFD700;
+            --dark: #1a1a1a;
+            --light: #f4f4f4;
+        }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--light); }
+        
+        #login-screen {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; background: var(--dark); color: white; padding: 20px;
+        }
+        input {
+            padding: 15px; width: 80%; margin: 10px 0; border-radius: 8px; border: none;
+        }
+        button {
+            padding: 15px; width: 80%; background: var(--primary); color: var(--dark);
+            font-weight: bold; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;
+        }
+        button:active { transform: scale(0.98); }
+
+        #app-screen { display: none; height: 100vh; position: relative; }
+        #map { height: 100%; width: 100%; }
+        
+        .bottom-panel {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: white; padding: 20px; border-radius: 20px 20px 0 0;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
+        }
+        .status-badge {
+            background: #eee; padding: 5px 10px; border-radius: 15px; font-size: 12px;
+            display: inline-block; margin-bottom: 10px;
+        }
+        .ride-info {
+            background: #fff3cd; padding: 10px; border-radius: 8px; margin-top: 10px;
+            display: none;
+        }
+    </style>
+
+    <!-- Librería de Mapas (Leaflet) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Librería de Supabase (Versión Web) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <!-- PANTALLA 1: LOGIN -->
+    <div id="login-screen">
+        <h1>🏍️ MotoRide</h1>
+        <p>Ingresa para pedir tu moto</p>
+        <input type="email" id="email" placeholder="Correo electrónico">
+        <input type="password" id="password" placeholder="Contraseña">
+        <button onclick="handleLogin()">Entrar / Registrarse</button>
+        <p id="msg" style="color: #ff6b6b; font-size: 12px;"></p>
+    </div>
+
+    <!-- PANTALLA 2: APP PRINCIPAL -->
+    <div id="app-screen">
+        <div id="map"></div>
+        
+        <div class="bottom-panel">
+            <span class="status-badge" id="user-status">📍 Obteniendo ubicación...</span>
+            <h3>¿A dónde vamos?</h3>
+            <input type="text" id="destino" placeholder="Ej: Parque Central, Centro Comercial..." style="width: 90%; margin: 0;">
+            <br><br>
+            <button onclick="pedirMoto()">🛵 PEDIR MOTO AHORA</button>
+            <div id="ride-info" class="ride-info">
+                <strong>Estado:</strong> <span id="ride-status">Buscando conductor...</span>
+            </div>
+            <button onclick="logout()" style="background: #ccc; margin-top: 10px;">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <!-- LÓGICA JAVASCRIPT -->
+    <script>
+        // 1. CONFIGURACIÓN DE SUPABASE (TUS CREDENCIALES)
+        const SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZ2RjemV6eW1hYWxjbndiZmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDU1NjgsImV4cCI6MjA4ODYyMTU2OH0.fyM-HOvnH8_XofOqjAyRe604m7EkodKDkhXqzhG7R_o';
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let map;
+        let userMarker;
+        let currentUser = null;
+        let currentRide = null;
+
+        // 2. INICIALIZAR MAPA
+        function initMap() {
+            // Coordenadas por defecto (Ciudad de México - CAMBIA ESTO A TU CIUDAD)
+            map = L.map('map').setView([19.4326, -99.1332], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            // Obtener ubicación real del usuario
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    map.setView([lat, lng], 15);
+                    
+                    userMarker = L.marker([lat, lng]).addTo(map)
+                        .bindPopup("📍 Tú estás aquí").openPopup();
+                    document.getElementById('user-status').innerText = "✅ Ubicación detectada";
+                    document.getElementById('user-status').style.background = "#d1fae5";
+                }, () => {
+                    document.getElementById('user-status').innerText = "⚠️ Permiso de ubicación denegado";
+                });
+            }
+        }
+
+        // 3. FUNCIONES DE LOGIN
+        async function handleLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const msg = document.getElementById('msg');
+
+            if(!email || !password) { 
+                msg.innerText = "⚠️ Llena todos los campos"; 
+                return; 
+            }
+
+            msg.innerText = "⏳ Procesando...";
+
+            // Intentar iniciar sesión
+            let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+            // Si falla, intentar registrar
+            if (error) {
+                let { data: regData, error: regError } = await supabase.auth.signUp({ 
+                    email, 
+                    password,
+                    options: { data: { full_name: email.split('@')[0] } }
+                });
+                if (regError) { 
+                    msg.innerText = "❌ Error: " + regError.message; 
+                } else { 
+                    msg.innerText = "✅ ¡Cuenta creada! Revisa tu correo o inicia sesión."; 
+                    msg.style.color = "#4ade80"; 
+                }
+            } else {
+                currentUser = data.user;
+                msg.innerText = "";
+                mostrarApp();
+            }
+        }
+
+        function mostrarApp() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'block';
+            initMap();
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            location.reload();
+        }
+
+        // 4. PEDIR VIAJE
+        async function pedirMoto() {
+            const destino = document.getElementById('destino').value;
+            if(!destino) { 
+                alert("⚠️ Escribe un destino"); 
+                return; 
+            }
+
+            document.getElementById('ride-info').style.display = 'block';
+            document.getElementById('ride-status').innerText = "🔍 Buscando conductor cercano...";
+
+            // Obtener coordenadas actuales
+            let pickupLat = 0, pickupLng = 0;
+            if (navigator.geolocation) {
+                const pos = await new Promise(resolve => navigator.geolocation.getCurrentPosition(resolve));
+                pickupLat = pos.coords.latitude;
+                pickupLng = pos.coords.longitude;
+            }
+
+            // Guardar el viaje en Supabase
+            const { data, error } = await supabase
+                .from('rides')
+                .insert([{ 
+                    passenger_id: currentUser.id, 
+                    pickup_address: 'Ubicación actual',
+                    pickup_lat: pickupLat,
+                    pickup_lng: pickupLng,
+                    dropoff_address: destino,
+                    status: 'pending'
+                }])
+                .select();
+
+            if (error) {
+                document.getElementById('ride-status').innerText = "❌ Error: " + error.message;
+            } else {
+                currentRide = data[0];
+                document.getElementById('ride-status').innerText = "⏳ Viaje solicitado - Esperando conductor...";
+                
+                // Simular búsqueda de conductor (2 segundos)
+                setTimeout(() => {
+                    document.getElementById('ride-status').innerText = "🛵 ¡Conductor encontrado! En camino...";
+                    document.getElementById('ride-status').style.color = "#16a34a";
+                }, 2000);
+            }
+        }
+
+        // 5. VERIFICAR SESIÓN AL CARGAR
+        window.onload = async () => {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+                currentUser = data.session.user;
+                mostrarApp();
+            }
+        };
+    </script>
+</body>
+</html>
