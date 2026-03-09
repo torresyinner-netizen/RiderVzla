@@ -7,7 +7,6 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <style>
@@ -17,200 +16,78 @@
             --accent: #FFD700;
             --text-main: #111827;
             --text-muted: #6b7280;
-            --bg-glass: rgba(255, 255, 255, 0.9);
+            --bg-glass: rgba(255, 255, 255, 0.95);
         }
 
-        /* Tipografía estilo iOS */
         body, input, button {
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
-        body {
-            background-color: #000;
-            overflow: hidden; /* Evita el scroll en web móvil */
-        }
+        body { background-color: #000; overflow: hidden; }
 
-        /* --- PANTALLA DE LOGIN --- */
+        /* --- LOGIN --- */
         #login-screen {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background: #ffffff;
-            padding: 30px;
-            box-sizing: border-box;
-            transition: opacity 0.4s ease;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; background: #ffffff; padding: 30px; box-sizing: border-box; transition: opacity 0.4s ease;
         }
-
-        #login-screen h1 {
-            font-size: 32px;
-            font-weight: 800;
-            color: var(--text-main);
-            margin-bottom: 5px;
-        }
-
-        #login-screen p {
-            color: var(--text-muted);
-            margin-bottom: 30px;
-        }
-
-        .input-group {
-            width: 100%;
-            max-width: 350px;
-            margin-bottom: 15px;
-        }
-
-        input {
-            width: 100%;
-            padding: 16px;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
-            background-color: var(--secondary);
-            font-size: 16px;
-            box-sizing: border-box;
-            transition: border 0.3s;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: var(--primary);
-            background-color: #fff;
-        }
-
+        #login-screen h1 { font-size: 32px; font-weight: 800; color: var(--text-main); margin-bottom: 5px; }
+        #login-screen p { color: var(--text-muted); margin-bottom: 30px; }
+        .input-group { width: 100%; max-width: 350px; margin-bottom: 15px; }
+        input { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #e5e7eb; background-color: var(--secondary); font-size: 16px; box-sizing: border-box; transition: border 0.3s; }
+        input:focus { outline: none; border-color: var(--primary); background-color: #fff; }
+        
         .btn-primary {
-            width: 100%;
-            max-width: 350px;
-            padding: 18px;
-            background: var(--primary);
-            color: #fff;
-            font-weight: 600;
-            border: none;
-            border-radius: 12px;
-            font-size: 17px;
-            cursor: pointer;
-            transition: transform 0.1s, opacity 0.2s;
-            margin-top: 10px;
+            width: 100%; padding: 18px; background: var(--primary); color: #fff; font-weight: 600;
+            border: none; border-radius: 12px; font-size: 17px; cursor: pointer; transition: transform 0.1s;
         }
-
-        .btn-primary:active {
-            transform: scale(0.97);
-            opacity: 0.9;
-        }
+        .btn-primary:active { transform: scale(0.97); }
 
         /* --- APP PRINCIPAL --- */
-        #app-screen {
-            display: none;
-            height: 100vh;
-            width: 100vw;
-            position: relative;
-        }
-
-        #map {
-            height: 100%;
-            width: 100%;
-            z-index: 1;
-        }
-
-        /* Panel Inferior (Bottom Sheet iOS) */
-        .bottom-sheet {
+        #app-screen { display: none; height: 100vh; width: 100vw; position: relative; }
+        
+        /* Contenedor del mapa y el Pin Central */
+        #map-container { position: relative; height: 100%; width: 100%; z-index: 1; }
+        #map { height: 100%; width: 100%; }
+        
+        /* EL PIN DE UBER FIJO EN EL CENTRO */
+        .center-marker {
             position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--bg-glass);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            padding: 24px;
-            border-radius: 30px 30px 0 0;
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.1);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -100%);
             z-index: 1000;
-            transform: translateY(0);
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* El "grabber" o línea superior del panel */
-        .drag-handle {
-            width: 40px;
-            height: 5px;
-            background-color: #d1d5db;
-            border-radius: 10px;
-            margin: 0 auto 20px auto;
-        }
-
-        .location-status {
-            display: flex;
-            align-items: center;
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 20px;
-        }
-
-        .location-status .dot {
-            width: 8px;
-            height: 8px;
-            background-color: #10b981;
-            border-radius: 50%;
-            margin-right: 8px;
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
-        }
-
-        h3 {
-            margin: 0 0 15px 0;
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .destination-container {
-            position: relative;
-            margin-bottom: 20px;
-        }
-
-        .destination-container input {
-            padding-left: 45px;
-            background-color: #f9fafb;
-            border: none;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        }
-
-        .destination-container::before {
-            content: "📍";
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 18px;
-        }
-
-        .ride-status-card {
-            display: none;
-            background: #fff;
-            border: 1px solid #f3f4f6;
-            padding: 16px;
-            border-radius: 16px;
-            margin-top: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            text-align: center;
-        }
-
-        .btn-logout {
-            background: transparent;
-            color: var(--text-muted);
-            font-size: 14px;
-            margin-top: 20px;
-            padding: 10px;
-            border: none;
+            pointer-events: none; /* Permite arrastrar el mapa a través del icono */
+            display: none; /* Oculto hasta que se active elegir destino */
+            font-size: 45px;
+            text-shadow: 0 5px 10px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
         }
         
-        /* Controles del mapa Leaflet (reubicarlos para que no los tape el panel) */
-        .leaflet-bottom.leaflet-right {
-            bottom: 300px !important;
+        /* Animación cuando mueves el mapa (el pin "salta") */
+        .center-marker.is-dragging { transform: translate(-50%, -120%); }
+
+        /* Panel Inferior */
+        .bottom-sheet {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: var(--bg-glass); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            padding: 24px; border-radius: 30px 30px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.1);
+            z-index: 1001; display: flex; flex-direction: column;
         }
+        .drag-handle { width: 40px; height: 5px; background-color: #d1d5db; border-radius: 10px; margin: 0 auto 20px auto; }
+        
+        .location-status { display: flex; align-items: center; font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
+        .location-status .dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+        h3 { margin: 0 0 15px 0; font-size: 22px; font-weight: 700; color: var(--text-main); }
+
+        .btn-secondary {
+            background: #e5e7eb; color: var(--text-main); width: 100%; padding: 18px;
+            font-weight: 600; border: none; border-radius: 12px; font-size: 17px; cursor: pointer; margin-bottom: 10px;
+        }
+        
+        .ride-status-card { display: none; background: #fff; border: 1px solid #f3f4f6; padding: 16px; border-radius: 16px; margin-top: 15px; text-align: center; }
+        .btn-logout { background: transparent; color: var(--text-muted); font-size: 14px; margin-top: 20px; padding: 10px; border: none; }
+        .leaflet-bottom.leaflet-right { bottom: 350px !important; }
     </style>
 </head>
 <body>
@@ -218,36 +95,44 @@
     <div id="login-screen">
         <h1>MotoRide</h1>
         <p>Tu viaje a un toque de distancia</p>
-        
-        <div class="input-group">
-            <input type="email" id="email" placeholder="Correo electrónico">
-        </div>
-        <div class="input-group">
-            <input type="password" id="password" placeholder="Contraseña">
-        </div>
-        
+        <div class="input-group"><input type="email" id="email" placeholder="Correo electrónico"></div>
+        <div class="input-group"><input type="password" id="password" placeholder="Contraseña"></div>
         <button class="btn-primary" onclick="handleLogin()">Continuar</button>
         <p id="msg" style="color: #ef4444; font-size: 14px; margin-top: 15px; text-align: center;"></p>
     </div>
 
     <div id="app-screen">
-        <div id="map"></div>
+        <div id="map-container">
+            <div id="map"></div>
+            <div id="center-marker" class="center-marker">📍</div>
+        </div>
         
         <div class="bottom-sheet">
             <div class="drag-handle"></div>
             
             <div class="location-status">
                 <div class="dot" id="dot-status"></div>
-                <span id="user-status">Buscando tu ubicación...</span>
+                <span id="user-status">Ubicación lista</span>
             </div>
 
-            <h3>¿A dónde vas?</h3>
-            <div class="destination-container">
-                <input type="text" id="destino" placeholder="Buscar destino...">
+            <div id="panel-inicial">
+                <h3>¿A dónde vamos?</h3>
+                <button class="btn-secondary" onclick="activarSeleccionMapa()">🗺️ Fijar destino en el mapa</button>
+            </div>
+
+            <div id="panel-confirmar" style="display: none;">
+                <h3 style="font-size: 18px;">Mueve el mapa para ajustar</h3>
+                <button class="btn-primary" onclick="confirmarDestino()" style="background: #10b981;">✅ Confirmar Destino</button>
+                <button class="btn-secondary" onclick="cancelarSeleccion()" style="margin-top: 10px; padding: 12px;">Cancelar</button>
             </div>
             
-            <button class="btn-primary" onclick="pedirMoto()">Solicitar Moto</button>
-            
+            <div id="panel-pedir" style="display: none;">
+                <h3 style="font-size: 18px;">Destino seleccionado</h3>
+                <p id="coords-text" style="color: var(--text-muted); font-size: 12px; margin-bottom: 15px;">Lat: 0, Lng: 0</p>
+                <button class="btn-primary" onclick="pedirMoto()">🛵 Solicitar Moto</button>
+                <button class="btn-secondary" onclick="cancelarSeleccion()" style="margin-top: 10px; padding: 12px;">Cambiar destino</button>
+            </div>
+
             <div id="ride-info" class="ride-status-card">
                 <div style="font-size: 24px; margin-bottom: 5px;">🛵</div>
                 <strong style="color: var(--text-main);">Estado del viaje</strong>
@@ -262,17 +147,20 @@
         // CONFIGURACIÓN DE SUPABASE
         const SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
         const SUPABASE_KEY = 'TU_CLAVE_AQUI'; // Asegúrate de colocar tu clave real aquí
-        
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let map = null;
         let userMarker = null;
+        let destinationMarker = null; // Para guardar el marcador final
         let currentUser = null;
         let currentRide = null;
+        
+        // Variables para guardar las coordenadas
+        let userLat = 0, userLng = 0;
+        let destLat = 0, destLng = 0;
 
-        // INICIALIZAR MAPA
         function initMap() {
-            // Coordenadas iniciales (Centro de Valencia) mientras el GPS carga
+            // Centrado inicial en Valencia
             map = L.map('map', { zoomControl: false }).setView([10.1620, -68.0077], 14);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -281,59 +169,98 @@
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
                     
-                    map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
+                    map.flyTo([userLat, userLng], 16, { animate: true, duration: 1.5 });
                     
-                    // Marcador personalizado estilo punto azul (iOS)
                     const userIcon = L.divIcon({
                         className: 'custom-div-icon',
                         html: "<div style='background-color:#3b82f6; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);'></div>",
-                        iconSize: [22, 22],
-                        iconAnchor: [11, 11]
+                        iconSize: [22, 22], iconAnchor: [11, 11]
                     });
 
-                    userMarker = L.marker([lat, lng], {icon: userIcon}).addTo(map);
-                    
-                    document.getElementById('user-status').innerText = "Ubicación actual precisa";
-                    document.getElementById('dot-status').style.backgroundColor = "#10b981"; // Verde
-                }, () => {
-                    document.getElementById('user-status').innerText = "No se pudo obtener la ubicación";
-                    document.getElementById('dot-status').style.backgroundColor = "#ef4444"; // Rojo
+                    userMarker = L.marker([userLat, userLng], {icon: userIcon}).addTo(map);
                 });
+            }
+
+            // Efectos visuales al mover el mapa
+            const centerMarkerEl = document.getElementById('center-marker');
+            map.on('movestart', () => {
+                if (centerMarkerEl.style.display === 'block') {
+                    centerMarkerEl.classList.add('is-dragging');
+                }
+            });
+            map.on('moveend', () => {
+                centerMarkerEl.classList.remove('is-dragging');
+            });
+        }
+
+        // --- LÓGICA DE SELECCIÓN DE DESTINO --- //
+        
+        function activarSeleccionMapa() {
+            document.getElementById('panel-inicial').style.display = 'none';
+            document.getElementById('panel-confirmar').style.display = 'block';
+            document.getElementById('center-marker').style.display = 'block';
+            
+            // Si ya había un marcador de destino previo, lo borramos
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+                destinationMarker = null;
             }
         }
 
-        // FUNCIONES DE LOGIN
+        function confirmarDestino() {
+            // Obtenemos las coordenadas exactas del centro del mapa en este momento
+            const center = map.getCenter();
+            destLat = center.lat;
+            destLng = center.lng;
+
+            // Ocultamos el pin flotante y colocamos un pin real de Leaflet en esa posición
+            document.getElementById('center-marker').style.display = 'none';
+            
+            const destIcon = L.divIcon({
+                className: 'custom-dest-icon',
+                html: "<div style='font-size:30px; margin-top:-30px; text-shadow: 0 4px 6px rgba(0,0,0,0.4);'>📍</div>",
+                iconSize: [30, 30], iconAnchor: [15, 15]
+            });
+            
+            destinationMarker = L.marker([destLat, destLng], {icon: destIcon}).addTo(map);
+
+            // Cambiamos la interfaz al panel de pedir moto
+            document.getElementById('panel-confirmar').style.display = 'none';
+            document.getElementById('panel-pedir').style.display = 'block';
+            
+            // Mostrar coordenadas abreviadas (En un futuro aquí puedes poner una API que diga "Calle Bolívar")
+            document.getElementById('coords-text').innerText = `Lat: ${destLat.toFixed(4)}, Lng: ${destLng.toFixed(4)}`;
+        }
+
+        function cancelarSeleccion() {
+            document.getElementById('panel-confirmar').style.display = 'none';
+            document.getElementById('panel-pedir').style.display = 'none';
+            document.getElementById('panel-inicial').style.display = 'block';
+            document.getElementById('center-marker').style.display = 'none';
+            
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+                destinationMarker = null;
+            }
+        }
+
+        // --- RESTO DE FUNCIONES (LOGIN Y PEDIR MOTO) --- //
+
         async function handleLogin() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const msg = document.getElementById('msg');
-
-            if(!email || !password) { 
-                msg.innerText = "Por favor, completa todos los campos."; 
-                return; 
-            }
-
+            if(!email || !password) return msg.innerText = "Completa todos los campos."; 
             msg.innerText = "Cargando...";
-            msg.style.color = "var(--text-muted)";
 
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
             if (error) {
-                const signUpResult = await supabaseClient.auth.signUp({ 
-                    email, password,
-                    options: { data: { full_name: email.split('@')[0] } }
-                });
-                
-                if (signUpResult.error) { 
-                    msg.innerText = signUpResult.error.message;
-                    msg.style.color = "#ef4444"; 
-                } else { 
-                    msg.innerText = "Cuenta creada. Por favor inicia sesión."; 
-                    msg.style.color = "#10b981"; 
-                }
+                const signUpResult = await supabaseClient.auth.signUp({ email, password });
+                if (signUpResult.error) { msg.innerText = signUpResult.error.message; } 
+                else { msg.innerText = "Cuenta creada. Inicia sesión."; msg.style.color = "#10b981"; }
             } else {
                 currentUser = data.user;
                 msg.innerText = "";
@@ -342,7 +269,6 @@
         }
 
         function mostrarApp() {
-            // Transición suave
             document.getElementById('login-screen').style.opacity = '0';
             setTimeout(() => {
                 document.getElementById('login-screen').style.display = 'none';
@@ -351,68 +277,46 @@
             }, 400);
         }
 
-        async function logout() {
-            await supabaseClient.auth.signOut();
-            location.reload();
-        }
+        async function logout() { await supabaseClient.auth.signOut(); location.reload(); }
 
-        // PEDIR VIAJE
         async function pedirMoto() {
-            const destino = document.getElementById('destino').value;
-            if(!destino) { 
-                alert("Por favor, ingresa a dónde quieres ir."); 
-                return; 
-            }
-
             const rideInfo = document.getElementById('ride-info');
             const rideStatus = document.getElementById('ride-status');
             
+            document.getElementById('panel-pedir').style.display = 'none';
             rideInfo.style.display = 'block';
-            rideStatus.innerText = "Conectando...";
-            rideStatus.style.color = "var(--text-muted)";
+            rideStatus.innerText = "Conectando con la base de datos...";
 
-            let pickupLat = 0, pickupLng = 0;
-            if (navigator.geolocation) {
-                const pos = await new Promise(resolve => navigator.geolocation.getCurrentPosition(resolve));
-                pickupLat = pos.coords.latitude;
-                pickupLng = pos.coords.longitude;
-            }
-
+            // Guardamos el viaje en Supabase con las coordenadas de Origen y Destino
             const { data, error } = await supabaseClient
                 .from('rides')
                 .insert([{ 
                     passenger_id: currentUser.id, 
-                    pickup_address: 'Ubicación actual',
-                    pickup_lat: pickupLat,
-                    pickup_lng: pickupLng,
-                    dropoff_address: destino,
+                    pickup_lat: userLat,
+                    pickup_lng: userLng,
+                    dropoff_lat: destLat,
+                    dropoff_lng: destLng,
                     status: 'pending'
                 }])
                 .select();
 
             if (error) {
-                rideStatus.innerText = "Error al solicitar: " + error.message;
+                rideStatus.innerText = "Error: " + error.message;
                 rideStatus.style.color = "#ef4444";
             } else {
                 currentRide = data[0];
                 rideStatus.innerText = "Buscando conductor cercano...";
                 
-                // Simulación visual
                 setTimeout(() => {
                     rideStatus.innerText = "¡Conductor en camino!";
                     rideStatus.style.color = "#10b981";
-                    rideStatus.style.fontWeight = "bold";
                 }, 3000);
             }
         }
 
-        // VERIFICAR SESIÓN
         window.onload = async function() {
             const { data } = await supabaseClient.auth.getSession();
-            if (data.session) {
-                currentUser = data.session.user;
-                mostrarApp();
-            }
+            if (data.session) { currentUser = data.session.user; mostrarApp(); }
         };
     </script>
 </body>
