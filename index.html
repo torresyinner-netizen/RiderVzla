@@ -50,7 +50,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- Librería de Supabase (Versión Web) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -84,15 +84,16 @@
     <!-- LÓGICA JAVASCRIPT -->
     <script>
         // 1. CONFIGURACIÓN DE SUPABASE (TUS CREDENCIALES)
-        const SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZ2RjemV6eW1hYWxjbndiZmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDU1NjgsImV4cCI6MjA4ODYyMTU2OH0.fyM-HOvnH8_XofOqjAyRe604m7EkodKDkhXqzhG7R_o';
+        var SUPABASE_URL = 'https://xdgdczezymaalcnwbfgi.supabase.co';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZ2RjemV6eW1hYWxjbndiZmdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDU1NjgsImV4cCI6MjA4ODYyMTU2OH0.fyM-HOvnH8_XofOqjAyRe604m7EkodKDkhXqzhG7R_o';
         
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // Crear cliente de Supabase
+        var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let map;
-        let userMarker;
-        let currentUser = null;
-        let currentRide = null;
+        var map = null;
+        var userMarker = null;
+        var currentUser = null;
+        var currentRide = null;
 
         // 2. INICIALIZAR MAPA
         function initMap() {
@@ -105,16 +106,16 @@
 
             // Obtener ubicación real del usuario
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
                     map.setView([lat, lng], 15);
                     
                     userMarker = L.marker([lat, lng]).addTo(map)
                         .bindPopup("📍 Tú estás aquí").openPopup();
                     document.getElementById('user-status').innerText = "✅ Ubicación detectada";
                     document.getElementById('user-status').style.background = "#d1fae5";
-                }, () => {
+                }, function() {
                     document.getElementById('user-status').innerText = "⚠️ Permiso de ubicación denegado";
                 });
             }
@@ -122,9 +123,9 @@
 
         // 3. FUNCIONES DE LOGIN
         async function handleLogin() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const msg = document.getElementById('msg');
+            var email = document.getElementById('email').value;
+            var password = document.getElementById('password').value;
+            var msg = document.getElementById('msg');
 
             if(!email || !password) { 
                 msg.innerText = "⚠️ Llena todos los campos"; 
@@ -134,23 +135,23 @@
             msg.innerText = "⏳ Procesando...";
 
             // Intentar iniciar sesión
-            let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            var signInResult = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
 
             // Si falla, intentar registrar
-            if (error) {
-                let { data: regData, error: regError } = await supabase.auth.signUp({ 
-                    email, 
-                    password,
+            if (signInResult.error) {
+                var signUpResult = await supabaseClient.auth.signUp({ 
+                    email: email, 
+                    password: password,
                     options: { data: { full_name: email.split('@')[0] } }
                 });
-                if (regError) { 
-                    msg.innerText = "❌ Error: " + regError.message; 
+                if (signUpResult.error) { 
+                    msg.innerText = "❌ Error: " + signUpResult.error.message; 
                 } else { 
                     msg.innerText = "✅ ¡Cuenta creada! Revisa tu correo o inicia sesión."; 
                     msg.style.color = "#4ade80"; 
                 }
             } else {
-                currentUser = data.user;
+                currentUser = signInResult.data.user;
                 msg.innerText = "";
                 mostrarApp();
             }
@@ -163,13 +164,13 @@
         }
 
         async function logout() {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
             location.reload();
         }
 
         // 4. PEDIR VIAJE
         async function pedirMoto() {
-            const destino = document.getElementById('destino').value;
+            var destino = document.getElementById('destino').value;
             if(!destino) { 
                 alert("⚠️ Escribe un destino"); 
                 return; 
@@ -179,15 +180,17 @@
             document.getElementById('ride-status').innerText = "🔍 Buscando conductor cercano...";
 
             // Obtener coordenadas actuales
-            let pickupLat = 0, pickupLng = 0;
+            var pickupLat = 0, pickupLng = 0;
             if (navigator.geolocation) {
-                const pos = await new Promise(resolve => navigator.geolocation.getCurrentPosition(resolve));
+                var pos = await new Promise(function(resolve) {
+                    navigator.geolocation.getCurrentPosition(resolve);
+                });
                 pickupLat = pos.coords.latitude;
                 pickupLng = pos.coords.longitude;
             }
 
             // Guardar el viaje en Supabase
-            const { data, error } = await supabase
+            var insertResult = await supabaseClient
                 .from('rides')
                 .insert([{ 
                     passenger_id: currentUser.id, 
@@ -199,14 +202,14 @@
                 }])
                 .select();
 
-            if (error) {
-                document.getElementById('ride-status').innerText = "❌ Error: " + error.message;
+            if (insertResult.error) {
+                document.getElementById('ride-status').innerText = "❌ Error: " + insertResult.error.message;
             } else {
-                currentRide = data[0];
+                currentRide = insertResult.data[0];
                 document.getElementById('ride-status').innerText = "⏳ Viaje solicitado - Esperando conductor...";
                 
                 // Simular búsqueda de conductor (2 segundos)
-                setTimeout(() => {
+                setTimeout(function() {
                     document.getElementById('ride-status').innerText = "🛵 ¡Conductor encontrado! En camino...";
                     document.getElementById('ride-status').style.color = "#16a34a";
                 }, 2000);
@@ -214,10 +217,10 @@
         }
 
         // 5. VERIFICAR SESIÓN AL CARGAR
-        window.onload = async () => {
-            const { data } = await supabase.auth.getSession();
-            if (data.session) {
-                currentUser = data.session.user;
+        window.onload = async function() {
+            var sessionResult = await supabaseClient.auth.getSession();
+            if (sessionResult.data.session) {
+                currentUser = sessionResult.data.session.user;
                 mostrarApp();
             }
         };
